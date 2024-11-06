@@ -2,186 +2,152 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Definição dos tipos de tokens
-typedef enum {
-    TOKEN_PROGRAM, TOKEN_VAR, TOKEN_BEGIN, TOKEN_END, TOKEN_IF, TOKEN_THEN, TOKEN_ELSE,
-    TOKEN_WHILE, TOKEN_DO, TOKEN_IDENTIFIER, TOKEN_INTEGER, TOKEN_REAL, TOKEN_SEMICOLON,
-    TOKEN_COLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_ASSIGN, TOKEN_EOF, TOKEN_UNKNOWN
-} TokenType;
-
+// Definições para o analisador léxico e tokens (exemplo simplificado)
 typedef struct {
-    TokenType type;
-    char lexeme[100];
+    char lexema[100];
+    char tipo[20];
+    int linha;
 } Token;
 
-// Variáveis globais
-Token tokenAtual;           // Token atual
-int linhaAtual = 1;         // Linha atual do código fonte
-FILE *file;                 // Arquivo de entrada com o código MicroPascal
+Token tokenAtual;
 
-// Função protótipo para o analisador léxico
-Token getNextToken(FILE *file);
-
-// Função que lê o próximo token do arquivo e atualiza o token atual
-void proximoToken() {
-    tokenAtual = getNextToken(file);
-    // Incrementa a linha se encontrar uma nova linha no código
-    if (strcmp(tokenAtual.lexeme, "\n") == 0) {
-        linhaAtual++;
-    }
+// Funções simuladas para o analisador léxico e de obtenção do próximo token
+Token ProximoToken() {
+    // Função simulada; substitua pelo código real do analisador léxico.
+    Token token;
+    token.linha = 1;
+    strcpy(token.lexema, "x");
+    strcpy(token.tipo, "identificador");
+    return token;
 }
 
-// Função CasaToken: verifica se o token atual é o esperado, caso contrário, exibe um erro
-void CasaToken(TokenType esperado) {
-    if (tokenAtual.type == esperado) {
-        proximoToken();  // Lê o próximo token se o atual for o esperado
-    } else if (tokenAtual.type == TOKEN_EOF) {
-        printf("%d:fim de arquivo não esperado.\n", linhaAtual);
-        exit(1);
+// Função para consumir tokens do programa, em conformidade com o esperado
+void CasaToken(const char *esperado) {
+    printf("DEBUG: Token esperado: %s, Token atual: %s\n", esperado, tokenAtual.lexema);  // Debug
+    if (strcmp(tokenAtual.tipo, esperado) == 0) {
+        tokenAtual = ProximoToken();  // Obtém próximo token
     } else {
-        printf("%d:token nao esperado [%s].\n", linhaAtual, tokenAtual.lexeme);
+        printf("%d:token nao esperado [%s].\n", tokenAtual.linha, tokenAtual.lexema);
         exit(1);
     }
 }
 
-// Funções para cada símbolo não-terminal da gramática
-
+// Função para analisar o programa inicial
 void AnalisarPrograma() {
-    CasaToken(TOKEN_PROGRAM);      // Espera "program"
-    CasaToken(TOKEN_IDENTIFIER);   // Espera um identificador (nome do programa)
-    CasaToken(TOKEN_SEMICOLON);    // Espera ponto e vírgula
-    AnalisarBloco();               // Chama a função para o bloco
-    CasaToken(TOKEN_DOT);          // Espera ponto final
+    printf("DEBUG: Iniciando análise do programa\n");  // Debug
+    CasaToken("program");
+    CasaToken("identificador");
+    CasaToken(";");
+    AnalisarBloco();
+    CasaToken(".");
 }
 
+// Analisadores sintáticos para cada produção da gramática
 void AnalisarBloco() {
-    AnalisarParteDeclaracoesVariaveis(); // Processa a parte de declarações
-    AnalisarComandoComposto();           // Processa o comando composto
+    printf("DEBUG: Analisando bloco\n");  // Debug
+    AnalisarParteDeclaracoesVariaveis();
+    AnalisarComandoComposto();
 }
 
 void AnalisarParteDeclaracoesVariaveis() {
-    if (tokenAtual.type == TOKEN_VAR) {
-        CasaToken(TOKEN_VAR);
-        AnalisarDeclaracaoVariaveis();
-        while (tokenAtual.type == TOKEN_SEMICOLON) {
-            CasaToken(TOKEN_SEMICOLON);
+    if (strcmp(tokenAtual.tipo, "var") == 0) {
+        CasaToken("var");
+        do {
             AnalisarDeclaracaoVariaveis();
-        }
-        CasaToken(TOKEN_SEMICOLON);
+            CasaToken(";");
+        } while (strcmp(tokenAtual.tipo, "identificador") == 0);
     }
 }
 
 void AnalisarDeclaracaoVariaveis() {
+    printf("DEBUG: Analisando declaração de variáveis\n");  // Debug
     AnalisarListaIdentificadores();
-    CasaToken(TOKEN_COLON);
+    CasaToken(":");
     AnalisarTipo();
 }
 
 void AnalisarListaIdentificadores() {
-    CasaToken(TOKEN_IDENTIFIER);
-    while (tokenAtual.type == TOKEN_COMMA) {
-        CasaToken(TOKEN_COMMA);
-        CasaToken(TOKEN_IDENTIFIER);
+    CasaToken("identificador");
+    while (strcmp(tokenAtual.lexema, ",") == 0) {
+        CasaToken(",");
+        CasaToken("identificador");
     }
 }
 
 void AnalisarTipo() {
-    if (tokenAtual.type == TOKEN_INTEGER) {
-        CasaToken(TOKEN_INTEGER);
-    } else if (tokenAtual.type == TOKEN_REAL) {
-        CasaToken(TOKEN_REAL);
+    if (strcmp(tokenAtual.lexema, "integer") == 0 || strcmp(tokenAtual.lexema, "real") == 0) {
+        CasaToken(tokenAtual.lexema);
     } else {
-        printf("%d:token nao esperado [%s].\n", linhaAtual, tokenAtual.lexeme);
+        printf("%d:token nao esperado [%s].\n", tokenAtual.linha, tokenAtual.lexema);
         exit(1);
     }
 }
 
 void AnalisarComandoComposto() {
-    CasaToken(TOKEN_BEGIN);
+    CasaToken("begin");
     AnalisarComando();
-    CasaToken(TOKEN_SEMICOLON);
-    while (tokenAtual.type != TOKEN_END) {
+    while (strcmp(tokenAtual.lexema, ";") == 0) {
+        CasaToken(";");
         AnalisarComando();
-        CasaToken(TOKEN_SEMICOLON);
     }
-    CasaToken(TOKEN_END);
+    CasaToken("end");
 }
 
 void AnalisarComando() {
-    if (tokenAtual.type == TOKEN_IDENTIFIER) {
+    printf("DEBUG: Analisando comando\n");  // Debug
+    if (strcmp(tokenAtual.tipo, "identificador") == 0) {
         AnalisarAtribuicao();
-    } else if (tokenAtual.type == TOKEN_BEGIN) {
-        AnalisarComandoComposto();
-    } else if (tokenAtual.type == TOKEN_IF) {
+    } else if (strcmp(tokenAtual.lexema, "if") == 0) {
         AnalisarComandoCondicional();
-    } else if (tokenAtual.type == TOKEN_WHILE) {
+    } else if (strcmp(tokenAtual.lexema, "while") == 0) {
         AnalisarComandoRepetitivo();
+    } else if (strcmp(tokenAtual.lexema, "begin") == 0) {
+        AnalisarComandoComposto();
     } else {
-        printf("%d:token nao esperado [%s].\n", linhaAtual, tokenAtual.lexeme);
+        printf("%d:token nao esperado [%s].\n", tokenAtual.linha, tokenAtual.lexema);
         exit(1);
     }
 }
 
-// Exemplo de implementação das funções de atribuição, comando condicional e repetitivo
-
 void AnalisarAtribuicao() {
-    CasaToken(TOKEN_IDENTIFIER);  // Variável
-    CasaToken(TOKEN_ASSIGN);      // Símbolo de atribuição :=
+    CasaToken("identificador");
+    CasaToken(":=");
     AnalisarExpressao();
 }
 
 void AnalisarComandoCondicional() {
-    CasaToken(TOKEN_IF);          // "if"
+    CasaToken("if");
     AnalisarExpressao();
-    CasaToken(TOKEN_THEN);        // "then"
+    CasaToken("then");
     AnalisarComando();
-    if (tokenAtual.type == TOKEN_ELSE) {
-        CasaToken(TOKEN_ELSE);    // "else"
+    if (strcmp(tokenAtual.lexema, "else") == 0) {
+        CasaToken("else");
         AnalisarComando();
     }
 }
 
 void AnalisarComandoRepetitivo() {
-    CasaToken(TOKEN_WHILE);       // "while"
+    CasaToken("while");
     AnalisarExpressao();
-    CasaToken(TOKEN_DO);          // "do"
+    CasaToken("do");
     AnalisarComando();
 }
 
-// Função de exemplo para análise de expressão (simplificada)
 void AnalisarExpressao() {
-    // Aqui, você implementaria a lógica de expressão completa
-    // Vamos supor que seja apenas um número ou um identificador
-    if (tokenAtual.type == TOKEN_IDENTIFIER || tokenAtual.type == TOKEN_INTEGER) {
-        CasaToken(tokenAtual.type);
-    } else {
-        printf("%d:token nao esperado [%s].\n", linhaAtual, tokenAtual.lexeme);
-        exit(1);
-    }
+    printf("DEBUG: Analisando expressão\n");  // Debug
+    // Exemplo simplificado para fins de debug; implemente a análise completa de expressões conforme necessário.
+    CasaToken("identificador");  // Exemplo de tratamento
 }
 
-// Função principal do compilador
 int main() {
-    file = fopen("programa.mpas", "r");
-    if (!file) {
-        printf("Erro ao abrir o arquivo.\n");
-        return 1;
+    tokenAtual = ProximoToken();
+    AnalisarPrograma();
+
+    if (strcmp(tokenAtual.tipo, "EOF") == 0) {
+        printf("Compilação concluída com sucesso.\n");
+    } else {
+        printf("%d:fim de arquivo não esperado.\n", tokenAtual.linha);
     }
 
-    linhaAtual = 1;       // Inicializa a linha
-    proximoToken();       // Lê o primeiro token
-    AnalisarPrograma();   // Inicia a análise sintática
-
-    printf("Compilação concluída sem erros.\n");
-    fclose(file);
     return 0;
-}
-
-// Função exemplo para obter o próximo token (getNextToken)
-Token getNextToken(FILE *file) {
-    Token token;
-    // Implementação da análise léxica (simplificada, exemplo):
-    // Aqui você leria do arquivo e atribuía o tipo e lexema do token
-    // ...
-    return token;
 }
