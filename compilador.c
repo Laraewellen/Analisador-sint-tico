@@ -1,67 +1,102 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
-// Estrutura para representar um token
 typedef struct {
     char lexema[50];
     char tipo[20];
     int linha;
 } Token;
 
-int pos = 0;  // Posição no fluxo de tokens de teste
+FILE *arquivoFonte;
 Token tokenAtual;
+int linhaAtual = 1;
 
-// Funções do analisador sintático
+// Declaração das funções
 Token ProximoToken();
 void Erro(char *mensagem);
 void Consumir(char *tipoEsperado);
 void AnalisarPrograma();
 void AnalisarBloco();
-void AnalisarParteDeclaracoesVariaveis();
 void AnalisarDeclaracaoVariaveis();
 void AnalisarListaIdentificadores();
 void AnalisarTipo();
 void AnalisarComandoComposto();
 void AnalisarComando();
-void AnalisarAtribuicao();
-void AnalisarComandoCondicional();
-void AnalisarComandoRepetitivo();
+void AnalisarExpressaoRelacional();
 void AnalisarExpressao();
 void AnalisarTermo();
 void AnalisarFator();
-void AnalisarExpressaoRelacional();
 
-// Simulação do fluxo de tokens para teste
+void AbrirArquivo(const char *nomeArquivo) {
+    arquivoFonte = fopen(nomeArquivo, "r");
+    if (arquivoFonte == NULL) {
+        perror("Erro ao abrir o arquivo");
+        exit(1);
+    }
+}
+
 Token ProximoToken() {
-    Token token;
-    
-    const char *fluxo_tokens[] = {"program", "identificador", ";", "var", "identificador", ",", "identificador", ":", "integer", ";", 
-                                  "begin", "identificador", ":=", "numero", ";", "identificador", ":=", "identificador", "+", "numero", ";", 
-                                  "if", "identificador", ">", "identificador", "then", "identificador", ":=", "numero", "else", 
-                                  "identificador", ":=", "numero", ";", "while", "identificador", "<", "numero", "do", 
-                                  "identificador", ":=", "identificador", "+", "numero", ";", "end", ".", "EOF"};
+    Token token = {"", "", linhaAtual};
+    char lexema[50];
+    int c;
 
-    const char *fluxo_tipos[] = {"program", "identificador", ";", "var", "identificador", ",", "identificador", ":", "integer", ";", 
-                                 "begin", "identificador", ":=", "numero", ";", "identificador", ":=", "identificador", "+", "numero", ";", 
-                                 "if", "identificador", ">", "identificador", "then", "identificador", ":=", "numero", "else", 
-                                 "identificador", ":=", "numero", ";", "while", "identificador", "<", "numero", "do", 
-                                 "identificador", ":=", "identificador", "+", "numero", ";", "end", ".", "EOF"};
-    
-    if (pos < sizeof(fluxo_tokens) / sizeof(fluxo_tokens[0])) {
-        strcpy(token.lexema, fluxo_tokens[pos]);
-        strcpy(token.tipo, fluxo_tipos[pos]);
-        token.linha = 1;  // Linha de exemplo
-        pos++;
-    } else {
-        strcpy(token.tipo, "EOF");
+    // Ignorar espaços, quebras de linha e comentários
+    while ((c = fgetc(arquivoFonte)) != EOF) {
+        if (c == ' ' || c == '\t') {
+            continue;
+        } else if (c == '\n') {
+            linhaAtual++;
+        } else if (c == '/' && (c = fgetc(arquivoFonte)) == '/') {
+            // Ignora comentários de linha
+            while ((c = fgetc(arquivoFonte)) != '\n' && c != EOF);
+            linhaAtual++;
+        } else {
+            ungetc(c, arquivoFonte);  // Retorna o caractere não-processado ao buffer
+            break;
+        }
     }
 
+    // Fim do arquivo
+    if (c == EOF) {
+        strcpy(token.tipo, "EOF");
+        return token;
+    }
+
+    // Lê um lexema do arquivo
+    fscanf(arquivoFonte, "%49s", lexema);
+
+    // Determinação do tipo de token (simplificado para exemplo)
+    if (strcmp(lexema, "program") == 0 || strcmp(lexema, "var") == 0 ||
+        strcmp(lexema, "begin") == 0 || strcmp(lexema, "end") == 0 ||
+        strcmp(lexema, "integer") == 0 || strcmp(lexema, "real") == 0 ||
+        strcmp(lexema, "if") == 0 || strcmp(lexema, "then") == 0 ||
+        strcmp(lexema, "else") == 0 || strcmp(lexema, "while") == 0 || 
+        strcmp(lexema, "do") == 0) {
+        strcpy(token.tipo, lexema);
+    } else if (strcmp(lexema, ":=") == 0 || strcmp(lexema, ">") == 0 ||
+               strcmp(lexema, "<") == 0 || strcmp(lexema, "=") == 0 ||
+               strcmp(lexema, ";") == 0 || strcmp(lexema, ":") == 0 ||
+               strcmp(lexema, ".") == 0 || strcmp(lexema, ",") == 0 ||
+               strcmp(lexema, "+") == 0 || strcmp(lexema, "-") == 0 ||
+               strcmp(lexema, "*") == 0 || strcmp(lexema, "/") == 0) {
+        strcpy(token.tipo, lexema);
+    } else if (isalpha(lexema[0])) {
+        strcpy(token.tipo, "identificador");
+    } else if (isdigit(lexema[0])) {
+        strcpy(token.tipo, "numero");
+    } else {
+        strcpy(token.tipo, "invalido");
+    }
+
+    strcpy(token.lexema, lexema);
+    token.linha = linhaAtual;
     return token;
 }
 
 void Erro(char *mensagem) {
-    printf("%d:%s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
-    // Consumir o próximo token para evitar loops infinitos
+    printf("%d: %s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
     tokenAtual = ProximoToken();
 }
 
@@ -69,31 +104,20 @@ void Consumir(char *tipoEsperado) {
     if (strcmp(tokenAtual.tipo, tipoEsperado) == 0) {
         tokenAtual = ProximoToken();
     } else {
-        char mensagem[100];
-        sprintf(mensagem, "token nao esperado");
-        Erro(mensagem);
+        Erro("token nao esperado");
     }
 }
 
 void AnalisarPrograma() {
     printf("DEBUG: Iniciando análise do programa\n");
-    if (strcmp(tokenAtual.tipo, "program") == 0) {
-        Consumir("program");
-        Consumir("identificador");
-        Consumir(";");
-        AnalisarBloco();
-        Consumir(".");
-    } else {
-        Erro("Esperado 'program' no início do programa");
-    }
+    Consumir("program");
+    Consumir("identificador");
+    Consumir(";");
+    AnalisarBloco();
+    Consumir(".");
 }
 
 void AnalisarBloco() {
-    AnalisarParteDeclaracoesVariaveis();
-    AnalisarComandoComposto();
-}
-
-void AnalisarParteDeclaracoesVariaveis() {
     if (strcmp(tokenAtual.tipo, "var") == 0) {
         Consumir("var");
         while (strcmp(tokenAtual.tipo, "identificador") == 0) {
@@ -101,6 +125,7 @@ void AnalisarParteDeclaracoesVariaveis() {
             Consumir(";");
         }
     }
+    AnalisarComandoComposto();
 }
 
 void AnalisarDeclaracaoVariaveis() {
@@ -110,18 +135,14 @@ void AnalisarDeclaracaoVariaveis() {
 }
 
 void AnalisarListaIdentificadores() {
-    Consumir("identificador");
-    while (strcmp(tokenAtual.tipo, ",") == 0) {
-        Consumir(",");
+    do {
         Consumir("identificador");
-    }
+    } while (strcmp(tokenAtual.tipo, ",") == 0 && (Consumir(","), 1));
 }
 
 void AnalisarTipo() {
-    if (strcmp(tokenAtual.tipo, "integer") == 0) {
-        Consumir("integer");
-    } else if (strcmp(tokenAtual.tipo, "real") == 0) {
-        Consumir("real");
+    if (strcmp(tokenAtual.tipo, "integer") == 0 || strcmp(tokenAtual.tipo, "real") == 0) {
+        Consumir(tokenAtual.tipo);
     } else {
         Erro("Tipo inválido");
     }
@@ -129,54 +150,41 @@ void AnalisarTipo() {
 
 void AnalisarComandoComposto() {
     Consumir("begin");
-    while (strcmp(tokenAtual.tipo, "end") != 0) {
+    do {
         AnalisarComando();
-        Consumir(";");
-    }
+        if (strcmp(tokenAtual.tipo, ";") == 0) Consumir(";");
+    } while (strcmp(tokenAtual.tipo, "end") != 0);
     Consumir("end");
 }
 
 void AnalisarComando() {
     if (strcmp(tokenAtual.tipo, "identificador") == 0) {
-        AnalisarAtribuicao();
+        Consumir("identificador");
+        Consumir(":=");
+        AnalisarExpressao();
     } else if (strcmp(tokenAtual.tipo, "if") == 0) {
-        AnalisarComandoCondicional();
+        Consumir("if");
+        AnalisarExpressaoRelacional();
+        Consumir("then");
+        AnalisarComando();
+        if (strcmp(tokenAtual.tipo, "else") == 0) {
+            Consumir("else");
+            AnalisarComando();
+        }
     } else if (strcmp(tokenAtual.tipo, "while") == 0) {
-        AnalisarComandoRepetitivo();
+        Consumir("while");
+        AnalisarExpressaoRelacional();
+        Consumir("do");
+        AnalisarComando();
     } else {
         Erro("Comando inválido");
     }
 }
 
-void AnalisarAtribuicao() {
-    Consumir("identificador");
-    Consumir(":=");
-    AnalisarExpressao();
-}
-
-void AnalisarComandoCondicional() {
-    Consumir("if");
-    AnalisarExpressaoRelacional();
-    Consumir("then");
-    AnalisarComando();
-    if (strcmp(tokenAtual.tipo, "else") == 0) {
-        Consumir("else");
-        AnalisarComando();
-    }
-}
-
-void AnalisarComandoRepetitivo() {
-    Consumir("while");
-    AnalisarExpressaoRelacional();
-    Consumir("do");
-    AnalisarComando();
-}
-
 void AnalisarExpressaoRelacional() {
     AnalisarExpressao();
-    if (strcmp(tokenAtual.tipo, ">") == 0 || strcmp(tokenAtual.tipo, "<") == 0 || 
-        strcmp(tokenAtual.tipo, "=") == 0 || strcmp(tokenAtual.tipo, "<=") == 0 || 
-        strcmp(tokenAtual.tipo, ">=") == 0 || strcmp(tokenAtual.tipo, "<>") == 0) {
+    if (strcmp(tokenAtual.tipo, ">") == 0 || strcmp(tokenAtual.tipo, "<") == 0 || strcmp(tokenAtual.tipo, "=") == 0 ||
+        strcmp(tokenAtual.tipo, "<=") == 0 || strcmp(tokenAtual.tipo, ">=") == 0 || strcmp(tokenAtual.tipo, "<>") == 0) {
         Consumir(tokenAtual.tipo);
         AnalisarExpressao();
     } else {
@@ -208,15 +216,21 @@ void AnalisarFator() {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: %s <arquivo.pas>\n", argv[0]);
+        return 1;
+    }
+
+    AbrirArquivo(argv[1]);
     tokenAtual = ProximoToken();
     AnalisarPrograma();
-
     if (strcmp(tokenAtual.tipo, "EOF") == 0) {
         printf("Análise concluída com sucesso.\n");
     } else {
         Erro("Código após o final do programa");
     }
 
+    fclose(arquivoFonte);
     return 0;
 }
