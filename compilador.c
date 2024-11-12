@@ -15,8 +15,8 @@ int linhaAtual = 1;
 
 // Declaração das funções
 Token ProximoToken();
-void Erro(char *mensagem);
-void Consumir(char *tipoEsperado);
+void Erro(const char *mensagem);
+void CasaToken(const char *tipoEsperado);
 void AnalisarPrograma();
 void AnalisarBloco();
 void AnalisarDeclaracaoVariaveis();
@@ -39,7 +39,6 @@ void AbrirArquivo(const char *nomeArquivo) {
 
 Token ProximoToken() {
     Token token = {"", "", linhaAtual};
-    char lexema[50];
     int c;
 
     // Ignorar espaços, quebras de linha e comentários
@@ -48,60 +47,90 @@ Token ProximoToken() {
             continue;
         } else if (c == '\n') {
             linhaAtual++;
+        } else if (c == '{') {
+            while ((c = fgetc(arquivoFonte)) != '}' && c != EOF) {
+                if (c == '\n') linhaAtual++;
+            }
         } else if (c == '/' && (c = fgetc(arquivoFonte)) == '/') {
-            // Ignora comentários de linha
             while ((c = fgetc(arquivoFonte)) != '\n' && c != EOF);
             linhaAtual++;
         } else {
-            ungetc(c, arquivoFonte);  // Retorna o caractere não-processado ao buffer
+            ungetc(c, arquivoFonte);
             break;
         }
     }
 
-    // Fim do arquivo
     if (c == EOF) {
         strcpy(token.tipo, "EOF");
         return token;
     }
 
-    // Lê um lexema do arquivo
-    fscanf(arquivoFonte, "%49s", lexema);
+    // Extração do próximo token
+    c = fgetc(arquivoFonte);
+    if (isalpha(c)) {
+        int i = 0;
+        do {
+            token.lexema[i++] = c;
+            c = fgetc(arquivoFonte);
+        } while (isalnum(c) && i < 49);
+        ungetc(c, arquivoFonte);
+        token.lexema[i] = '\0';
 
-    // Determinação do tipo de token (simplificado para exemplo)
-    if (strcmp(lexema, "program") == 0 || strcmp(lexema, "var") == 0 ||
-        strcmp(lexema, "begin") == 0 || strcmp(lexema, "end") == 0 ||
-        strcmp(lexema, "integer") == 0 || strcmp(lexema, "real") == 0 ||
-        strcmp(lexema, "if") == 0 || strcmp(lexema, "then") == 0 ||
-        strcmp(lexema, "else") == 0 || strcmp(lexema, "while") == 0 || 
-        strcmp(lexema, "do") == 0) {
-        strcpy(token.tipo, lexema);
-    } else if (strcmp(lexema, ":=") == 0 || strcmp(lexema, ">") == 0 ||
-               strcmp(lexema, "<") == 0 || strcmp(lexema, "=") == 0 ||
-               strcmp(lexema, ";") == 0 || strcmp(lexema, ":") == 0 ||
-               strcmp(lexema, ".") == 0 || strcmp(lexema, ",") == 0 ||
-               strcmp(lexema, "+") == 0 || strcmp(lexema, "-") == 0 ||
-               strcmp(lexema, "*") == 0 || strcmp(lexema, "/") == 0) {
-        strcpy(token.tipo, lexema);
-    } else if (isalpha(lexema[0])) {
-        strcpy(token.tipo, "identificador");
-    } else if (isdigit(lexema[0])) {
+        // Verifica se é palavra reservada
+        if (strcmp(token.lexema, "program") == 0 || strcmp(token.lexema, "var") == 0 ||
+            strcmp(token.lexema, "begin") == 0 || strcmp(token.lexema, "end") == 0 ||
+            strcmp(token.lexema, "integer") == 0 || strcmp(token.lexema, "real") == 0 ||
+            strcmp(token.lexema, "if") == 0 || strcmp(token.lexema, "then") == 0 ||
+            strcmp(token.lexema, "else") == 0 || strcmp(token.lexema, "while") == 0 || 
+            strcmp(token.lexema, "do") == 0) {
+            strcpy(token.tipo, token.lexema);
+        } else {
+            strcpy(token.tipo, "identificador");
+        }
+    } else if (isdigit(c)) {
+        int i = 0;
+        do {
+            token.lexema[i++] = c;
+            c = fgetc(arquivoFonte);
+        } while (isdigit(c) && i < 49);
+        ungetc(c, arquivoFonte);
+        token.lexema[i] = '\0';
         strcpy(token.tipo, "numero");
     } else {
-        strcpy(token.tipo, "invalido");
+        token.lexema[0] = c;
+        token.lexema[1] = '\0';
+        switch (c) {
+            case ':':
+                c = fgetc(arquivoFonte);
+                if (c == '=') {
+                    strcpy(token.lexema, ":=");
+                    strcpy(token.tipo, ":=");
+                } else {
+                    ungetc(c, arquivoFonte);
+                    strcpy(token.tipo, ":");
+                }
+                break;
+            case '>': case '<': case '=': case ';': case '.': case ',':
+            case '+': case '-': case '*': case '/':
+                strcpy(token.tipo, token.lexema);
+                break;
+            default:
+                strcpy(token.tipo, "invalido");
+        }
     }
 
-    strcpy(token.lexema, lexema);
     token.linha = linhaAtual;
     return token;
 }
 
-void Erro(char *mensagem) {
-    printf("%d: %s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
-    tokenAtual = ProximoToken();
+void Erro(const char *mensagem) {
+    printf("%d:%s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
+    exit(1);
 }
 
-void Consumir(char *tipoEsperado) {
+void CasaToken(const char *tipoEsperado) {
     if (strcmp(tokenAtual.tipo, tipoEsperado) == 0) {
+        printf("Consumindo token: %s [%s]\n", tokenAtual.tipo, tokenAtual.lexema);
         tokenAtual = ProximoToken();
     } else {
         Erro("token nao esperado");
@@ -109,20 +138,19 @@ void Consumir(char *tipoEsperado) {
 }
 
 void AnalisarPrograma() {
-    printf("DEBUG: Iniciando análise do programa\n");
-    Consumir("program");
-    Consumir("identificador");
-    Consumir(";");
+    CasaToken("program");
+    CasaToken("identificador");
+    CasaToken(";");
     AnalisarBloco();
-    Consumir(".");
+    CasaToken(".");
 }
 
 void AnalisarBloco() {
     if (strcmp(tokenAtual.tipo, "var") == 0) {
-        Consumir("var");
+        CasaToken("var");
         while (strcmp(tokenAtual.tipo, "identificador") == 0) {
             AnalisarDeclaracaoVariaveis();
-            Consumir(";");
+            CasaToken(";");
         }
     }
     AnalisarComandoComposto();
@@ -130,51 +158,51 @@ void AnalisarBloco() {
 
 void AnalisarDeclaracaoVariaveis() {
     AnalisarListaIdentificadores();
-    Consumir(":");
+    CasaToken(":");
     AnalisarTipo();
 }
 
 void AnalisarListaIdentificadores() {
     do {
-        Consumir("identificador");
-    } while (strcmp(tokenAtual.tipo, ",") == 0 && (Consumir(","), 1));
+        CasaToken("identificador");
+    } while (strcmp(tokenAtual.tipo, ",") == 0 && (CasaToken(","), 1));
 }
 
 void AnalisarTipo() {
     if (strcmp(tokenAtual.tipo, "integer") == 0 || strcmp(tokenAtual.tipo, "real") == 0) {
-        Consumir(tokenAtual.tipo);
+        CasaToken(tokenAtual.tipo);
     } else {
         Erro("Tipo inválido");
     }
 }
 
 void AnalisarComandoComposto() {
-    Consumir("begin");
+    CasaToken("begin");
     do {
         AnalisarComando();
-        if (strcmp(tokenAtual.tipo, ";") == 0) Consumir(";");
+        if (strcmp(tokenAtual.tipo, ";") == 0) CasaToken(";");
     } while (strcmp(tokenAtual.tipo, "end") != 0);
-    Consumir("end");
+    CasaToken("end");
 }
 
 void AnalisarComando() {
     if (strcmp(tokenAtual.tipo, "identificador") == 0) {
-        Consumir("identificador");
-        Consumir(":=");
+        CasaToken("identificador");
+        CasaToken(":=");
         AnalisarExpressao();
     } else if (strcmp(tokenAtual.tipo, "if") == 0) {
-        Consumir("if");
+        CasaToken("if");
         AnalisarExpressaoRelacional();
-        Consumir("then");
+        CasaToken("then");
         AnalisarComando();
         if (strcmp(tokenAtual.tipo, "else") == 0) {
-            Consumir("else");
+            CasaToken("else");
             AnalisarComando();
         }
     } else if (strcmp(tokenAtual.tipo, "while") == 0) {
-        Consumir("while");
+        CasaToken("while");
         AnalisarExpressaoRelacional();
-        Consumir("do");
+        CasaToken("do");
         AnalisarComando();
     } else {
         Erro("Comando inválido");
@@ -185,7 +213,7 @@ void AnalisarExpressaoRelacional() {
     AnalisarExpressao();
     if (strcmp(tokenAtual.tipo, ">") == 0 || strcmp(tokenAtual.tipo, "<") == 0 || strcmp(tokenAtual.tipo, "=") == 0 ||
         strcmp(tokenAtual.tipo, "<=") == 0 || strcmp(tokenAtual.tipo, ">=") == 0 || strcmp(tokenAtual.tipo, "<>") == 0) {
-        Consumir(tokenAtual.tipo);
+        CasaToken(tokenAtual.tipo);
         AnalisarExpressao();
     } else {
         Erro("Operador relacional esperado");
@@ -195,7 +223,7 @@ void AnalisarExpressaoRelacional() {
 void AnalisarExpressao() {
     AnalisarTermo();
     while (strcmp(tokenAtual.tipo, "+") == 0 || strcmp(tokenAtual.tipo, "-") == 0) {
-        Consumir(tokenAtual.tipo);
+        CasaToken(tokenAtual.tipo);
         AnalisarTermo();
     }
 }
@@ -203,14 +231,14 @@ void AnalisarExpressao() {
 void AnalisarTermo() {
     AnalisarFator();
     while (strcmp(tokenAtual.tipo, "*") == 0 || strcmp(tokenAtual.tipo, "/") == 0) {
-        Consumir(tokenAtual.tipo);
+        CasaToken(tokenAtual.tipo);
         AnalisarFator();
     }
 }
 
 void AnalisarFator() {
     if (strcmp(tokenAtual.tipo, "identificador") == 0 || strcmp(tokenAtual.tipo, "numero") == 0) {
-        Consumir(tokenAtual.tipo);
+        CasaToken(tokenAtual.tipo);
     } else {
         Erro("Fator inválido");
     }

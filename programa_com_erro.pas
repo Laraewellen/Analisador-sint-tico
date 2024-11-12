@@ -11,4 +11,4 @@ begin
         z := 2.0;
     while x < 20 do
         x := x + 1
-end  // Falta o ponto final
+end  
