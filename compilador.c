@@ -89,13 +89,19 @@ Token ProximoToken() {
         }
     } else if (isdigit(c)) {
         int i = 0;
+        int pontoDecimal = 0;
         do {
+            if (c == '.' && !pontoDecimal) {
+                pontoDecimal = 1;
+            } else if (c == '.' && pontoDecimal) {
+                break;  // segundo ponto decimal encontrado, interrompe
+            }
             token.lexema[i++] = c;
             c = fgetc(arquivoFonte);
-        } while (isdigit(c) && i < 49);
+        } while ((isdigit(c) || c == '.') && i < 49);
         ungetc(c, arquivoFonte);
         token.lexema[i] = '\0';
-        strcpy(token.tipo, "numero");
+        strcpy(token.tipo, pontoDecimal ? "numero_real" : "numero");
     } else {
         token.lexema[0] = c;
         token.lexema[1] = '\0';
@@ -124,7 +130,7 @@ Token ProximoToken() {
 }
 
 void Erro(const char *mensagem) {
-    printf("%d: Erro de sintaxe: %s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
+    printf("%d:%s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
     exit(1);
 }
 
@@ -158,9 +164,6 @@ void AnalisarBloco() {
 
 void AnalisarDeclaracaoVariaveis() {
     AnalisarListaIdentificadores();
-    if (strcmp(tokenAtual.tipo, ":") != 0) {
-        Erro("Tipo esperado após identificador");
-    }
     CasaToken(":");
     AnalisarTipo();
 }
@@ -240,7 +243,7 @@ void AnalisarTermo() {
 }
 
 void AnalisarFator() {
-    if (strcmp(tokenAtual.tipo, "identificador") == 0 || strcmp(tokenAtual.tipo, "numero") == 0) {
+    if (strcmp(tokenAtual.tipo, "identificador") == 0 || strcmp(tokenAtual.tipo, "numero") == 0 || strcmp(tokenAtual.tipo, "numero_real") == 0) {
         CasaToken(tokenAtual.tipo);
     } else {
         Erro("Fator inválido");
