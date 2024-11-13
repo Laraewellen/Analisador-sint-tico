@@ -124,7 +124,7 @@ Token ProximoToken() {
 }
 
 void Erro(const char *mensagem) {
-    printf("%d:%s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
+    printf("%d: Erro de sintaxe: %s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
     exit(1);
 }
 
@@ -158,6 +158,9 @@ void AnalisarBloco() {
 
 void AnalisarDeclaracaoVariaveis() {
     AnalisarListaIdentificadores();
+    if (strcmp(tokenAtual.tipo, ":") != 0) {
+        Erro("Tipo esperado após identificador");
+    }
     CasaToken(":");
     AnalisarTipo();
 }
