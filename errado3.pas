@@ -1,9 +1,9 @@
-program erro3;
+program erro_condicional;
 var
     x: integer;
-    y: real;
 begin
     x := 10;
-    y := x + "texto";  // Erro de tipo: operação inválida entre um número e uma string
-    x := x + 1;
+    if x > 5 then
+        writeln('X é maior que 5')
+    else;  { Erro aqui: o "else" está vazio ou mal estruturado }
 end.

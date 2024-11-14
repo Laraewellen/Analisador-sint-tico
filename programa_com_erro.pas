@@ -1,14 +1,9 @@
-program erroExemplo;
+program erro_declare_variavel;
 var
-    x, y integer;  // Falta o ":" após o identificador "y"
-    z: real;
+    x: integer;
+    y: real;
+    z: integer real;  { Erro aqui: tentativa de declarar duas variáveis de tipos diferentes na mesma linha }
 begin
     x := 10;
-    y := x + 2;
-    if x > y
-        z := 1.5;  // Falta "then" na estrutura if-then
-    else
-        z := 2.0;
-    while x < 20 do
-        x := x + 1
-end  
+    y := 5.5;
+end.
