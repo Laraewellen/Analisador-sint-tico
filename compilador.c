@@ -9,6 +9,15 @@ typedef struct {
     int linha;
 } Token;
 
+typedef struct {
+    char nome[50];
+    char tipo[20];
+} Simbolo;
+
+#define MAX_SIMBOLOS 100
+Simbolo tabelaSimbolos[MAX_SIMBOLOS];
+int contadorSimbolos = 0;
+
 FILE *arquivoFonte;
 Token tokenAtual;
 int linhaAtual = 1;
@@ -28,14 +37,23 @@ void AnalisarExpressao();
 void AnalisarTermo();
 void AnalisarFator();
 
-void AbrirArquivo(const char *nomeArquivo) {
-    arquivoFonte = fopen(nomeArquivo, "r");
-    if (arquivoFonte == NULL) {
-        perror("Erro ao abrir o arquivo");
-        exit(1);
-    }
+// Funções para gerenciamento da tabela de símbolos
+void AdicionarSimbolo(const char *nome, const char *tipo) {
+    strcpy(tabelaSimbolos[contadorSimbolos].nome, nome);
+    strcpy(tabelaSimbolos[contadorSimbolos].tipo, tipo);
+    contadorSimbolos++;
 }
 
+const char* BuscarTipoSimbolo(const char *nome) {
+    for (int i = 0; i < contadorSimbolos; i++) {
+        if (strcmp(tabelaSimbolos[i].nome, nome) == 0) {
+            return tabelaSimbolos[i].tipo;
+        }
+    }
+    return NULL; // Retorna NULL se o símbolo não for encontrado
+}
+
+// Função para obter o próximo token
 Token ProximoToken() {
     Token token = {"", "", linhaAtual};
     int c;
@@ -122,7 +140,7 @@ Token ProximoToken() {
                     strcpy(token.tipo, ":");
                 }
                 break;
-            case '>': case '<': case '=': case ';': case '.': case ',':
+            case '>': case '<': case '=': case ';': case '.': case ',': 
             case '+': case '-': case '*': case '/':
                 strcpy(token.tipo, token.lexema);
                 break;
@@ -153,6 +171,7 @@ void CasaToken(const char *tipoEsperado) {
     }
 }
 
+// Função para inicializar o arquivo e o analisador
 void AnalisarPrograma() {
     CasaToken("program");
     CasaToken("identificador");
@@ -162,32 +181,41 @@ void AnalisarPrograma() {
 }
 
 void AnalisarBloco() {
-    if (strcmp(tokenAtual.tipo, "var") == 0) {
-        CasaToken("var");
-        while (strcmp(tokenAtual.tipo, "identificador") == 0) {
-            AnalisarDeclaracaoVariaveis();
-            CasaToken(";");
-        }
-    }
+    AnalisarDeclaracaoVariaveis();
     AnalisarComandoComposto();
 }
 
 void AnalisarDeclaracaoVariaveis() {
-    AnalisarListaIdentificadores();
-    CasaToken(":");
-    AnalisarTipo();
+    CasaToken("var");
+    
+    // Verifica se há identificadores e consome a lista de variáveis
+    while (strcmp(tokenAtual.tipo, "identificador") == 0) {
+        AnalisarListaIdentificadores();
+        CasaToken(":");
+        AnalisarTipo();
+        CasaToken(";");  // Consome o ponto e vírgula após o tipo
+    }
 }
 
+
 void AnalisarListaIdentificadores() {
+    AdicionarSimbolo(tokenAtual.lexema, ""); // Adiciona o nome, tipo preenchido posteriormente
     CasaToken("identificador");
     while (strcmp(tokenAtual.tipo, ",") == 0) {
         CasaToken(",");
+        AdicionarSimbolo(tokenAtual.lexema, "");
         CasaToken("identificador");
     }
 }
 
 void AnalisarTipo() {
     if (strcmp(tokenAtual.tipo, "integer") == 0 || strcmp(tokenAtual.tipo, "real") == 0) {
+        const char* tipo = tokenAtual.tipo;
+        for (int i = contadorSimbolos - 1; i >= 0; i--) {
+            if (strcmp(tabelaSimbolos[i].tipo, "") == 0) {
+                strcpy(tabelaSimbolos[i].tipo, tipo);
+            }
+        }
         CasaToken(tokenAtual.tipo);
     } else {
         Erro("Tipo inválido", NULL);
@@ -196,91 +224,97 @@ void AnalisarTipo() {
 
 void AnalisarComandoComposto() {
     CasaToken("begin");
-    do {
+    AnalisarComando();
+    while (strcmp(tokenAtual.tipo, ";") == 0) {
+        CasaToken(";");
         AnalisarComando();
-        if (strcmp(tokenAtual.tipo, ";") == 0) CasaToken(";");
-    } while (strcmp(tokenAtual.tipo, "end") != 0);
+    }
     CasaToken("end");
 }
 
 void AnalisarComando() {
     if (strcmp(tokenAtual.tipo, "identificador") == 0) {
+        const char* tipoVar = BuscarTipoSimbolo(tokenAtual.lexema);
+        if (!tipoVar) {
+            Erro("Variável não declarada", tokenAtual.lexema);
+        }
         CasaToken("identificador");
         CasaToken(":=");
         AnalisarExpressao();
-    } else if (strcmp(tokenAtual.tipo, "if") == 0) {
-        CasaToken("if");
-        AnalisarExpressaoRelacional();
-        CasaToken("then");
-        AnalisarComando();
-        if (strcmp(tokenAtual.tipo, "else") == 0) {
-            CasaToken("else");
-            AnalisarComando();
-        }
-    } else if (strcmp(tokenAtual.tipo, "while") == 0) {
-        CasaToken("while");
-        AnalisarExpressaoRelacional();
-        CasaToken("do");
-        AnalisarComando();
+    } else if (strcmp(tokenAtual.tipo, "begin") == 0) {
+        AnalisarComandoComposto();
     } else {
         Erro("Comando inválido", NULL);
     }
 }
 
-void AnalisarExpressaoRelacional() {
-    AnalisarExpressao();
-    if (strcmp(tokenAtual.tipo, ">") == 0 || strcmp(tokenAtual.tipo, "<") == 0 || strcmp(tokenAtual.tipo, "=") == 0 ||
-        strcmp(tokenAtual.tipo, "<=") == 0 || strcmp(tokenAtual.tipo, ">=") == 0 || strcmp(tokenAtual.tipo, "<>") == 0) {
-        CasaToken(tokenAtual.tipo);
-        AnalisarExpressao();
-    } else {
-        Erro("Operador relacional esperado", NULL);
-    }
-}
-
 void AnalisarExpressao() {
-    AnalisarTermo();
-    while (strcmp(tokenAtual.tipo, "+") == 0 || strcmp(tokenAtual.tipo, "-") == 0) {
-        CasaToken(tokenAtual.tipo);
-        AnalisarTermo();
-    }
-}
+    const char *tipoOperando = NULL;
 
-void AnalisarTermo() {
-    AnalisarFator();
-    while (strcmp(tokenAtual.tipo, "*") == 0 || strcmp(tokenAtual.tipo, "/") == 0) {
-        CasaToken(tokenAtual.tipo);
-        AnalisarFator();
-    }
-}
-
-void AnalisarFator() {
-    if (strcmp(tokenAtual.tipo, "identificador") == 0 || strcmp(tokenAtual.tipo, "numero") == 0 || strcmp(tokenAtual.tipo, "numero_real") == 0) {
-        CasaToken(tokenAtual.tipo);
+    // Verifica o primeiro operando
+    if (strcmp(tokenAtual.tipo, "identificador") == 0) {
+        tipoOperando = BuscarTipoSimbolo(tokenAtual.lexema);
+        if (tipoOperando == NULL) {
+            Erro("Variável não declarada", tokenAtual.lexema);
+        }
+    } else if (strcmp(tokenAtual.tipo, "numero") == 0 || strcmp(tokenAtual.tipo, "numero_real") == 0) {
+        tipoOperando = tokenAtual.tipo;
     } else if (strcmp(tokenAtual.tipo, "string") == 0) {
-        CasaToken("string");
-    } else if (strcmp(tokenAtual.tipo, "(") == 0) {
-        CasaToken("(");
-        AnalisarExpressao();
-        CasaToken(")");
+        tipoOperando = "string";  // Se o operando for string
     } else {
-        Erro("Fator inválido", NULL);
+        Erro("Operando inválido", NULL);
+    }
+
+    CasaToken(tokenAtual.tipo);  // Consome o primeiro operando
+
+    // Trata os operadores aritméticos (+ e -)
+    while (strcmp(tokenAtual.tipo, "+") == 0 || strcmp(tokenAtual.tipo, "-") == 0) {
+        CasaToken(tokenAtual.tipo);  // Consome o operador
+        const char *tipoProximoOperando = NULL;
+
+        // Verifica o tipo do próximo operando
+        if (strcmp(tokenAtual.tipo, "identificador") == 0) {
+            tipoProximoOperando = BuscarTipoSimbolo(tokenAtual.lexema);
+            if (tipoProximoOperando == NULL) {
+                Erro("Variável não declarada", tokenAtual.lexema);
+            }
+        } else if (strcmp(tokenAtual.tipo, "numero") == 0 || strcmp(tokenAtual.tipo, "numero_real") == 0) {
+            tipoProximoOperando = tokenAtual.tipo;
+        } else if (strcmp(tokenAtual.tipo, "string") == 0) {
+            tipoProximoOperando = "string";  // Se o operando for string
+        }
+
+        // Verifica se os tipos são compatíveis
+        if ((tipoOperando && tipoProximoOperando) && 
+            (strcmp(tipoOperando, tipoProximoOperando) != 0)) {
+            // Caso específico para erro de string com número ou vice-versa
+            if ((strcmp(tipoOperando, "string") == 0 && (strcmp(tipoProximoOperando, "numero") == 0 || strcmp(tipoProximoOperando, "numero_real") == 0)) ||
+                ((strcmp(tipoOperando, "numero") == 0 || strcmp(tipoOperando, "numero_real") == 0) && strcmp(tipoProximoOperando, "string") == 0)) {
+                Erro("Erro de tipo: operação inválida entre número e string", NULL);
+            }
+        }
+
+        CasaToken(tokenAtual.tipo);  // Consome o próximo operando
     }
 }
+
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "Uso: %s <arquivo_fonte>\n", argv[0]);
+        printf("Uso: %s <arquivo fonte>\n", argv[0]);
         return 1;
     }
-    AbrirArquivo(argv[1]);
+
+    arquivoFonte = fopen(argv[1], "r");
+    if (arquivoFonte == NULL) {
+        printf("Erro ao abrir o arquivo %s\n", argv[1]);
+        return 1;
+    }
+
     tokenAtual = ProximoToken();
     AnalisarPrograma();
-    if (strcmp(tokenAtual.tipo, "EOF") == 0) {
-        printf("Análise concluída com sucesso!\n");
-    } else {
-        Erro("Código após o final do programa", NULL);
-    }
+    printf("Análise sintática concluída com sucesso.\n");
+
     fclose(arquivoFonte);
     return 0;
 }
