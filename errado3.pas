@@ -1,4 +1,4 @@
-program erro2;
+program erro3;
 var
     x: integer;
     y: real;

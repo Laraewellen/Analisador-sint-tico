@@ -153,13 +153,13 @@ Token ProximoToken() {
     return token;
 }
 
-void Erro(const char *mensagem, const char *tipoEsperado) {
-    if (tipoEsperado) {
-        printf("%d:%s, esperado [%s] mas encontrado [%s].\n", tokenAtual.linha, mensagem, tipoEsperado, tokenAtual.lexema);
+void Erro(const char *mensagem, const char *token) {
+    if (token != NULL) {
+        printf("Erro: %s próximo a '%s'\n", mensagem, token);
     } else {
-        printf("%d:%s [%s].\n", tokenAtual.linha, mensagem, tokenAtual.lexema);
+        printf("Erro: %s\n", mensagem);
     }
-    exit(1);
+    exit(1);  // Interrompe a execução para que a análise não prossiga após um erro.
 }
 
 void CasaToken(const char *tipoEsperado) {
@@ -224,11 +224,21 @@ void AnalisarTipo() {
 
 void AnalisarComandoComposto() {
     CasaToken("begin");
-    AnalisarComando();
-    while (strcmp(tokenAtual.tipo, ";") == 0) {
-        CasaToken(";");
+    
+    // Se houver comandos para analisar, processa-os
+    while (strcmp(tokenAtual.tipo, "end") != 0) {
         AnalisarComando();
+        
+        // Se após o comando encontrado houver um ponto e vírgula (;), consome-o
+        if (strcmp(tokenAtual.tipo, ";") == 0) {
+            CasaToken(";");
+        } else if (strcmp(tokenAtual.tipo, "end") != 0) {
+            // Se não encontrar ";" ou "end", significa que houve um erro
+            Erro("Esperado ';' ou 'end' após o comando", NULL);
+        }
     }
+    
+    // Consome o token "end" para fechar o bloco composto
     CasaToken("end");
 }
 
@@ -281,17 +291,15 @@ void AnalisarExpressao() {
         } else if (strcmp(tokenAtual.tipo, "numero") == 0 || strcmp(tokenAtual.tipo, "numero_real") == 0) {
             tipoProximoOperando = tokenAtual.tipo;
         } else if (strcmp(tokenAtual.tipo, "string") == 0) {
-            tipoProximoOperando = "string";  // Se o operando for string
+            tipoProximoOperando = "string";
         }
 
-        // Verifica se os tipos são compatíveis
+        // Verifica se os tipos são compatíveis (exclui combinação de tipos inválidos, como string com número)
         if ((tipoOperando && tipoProximoOperando) && 
-            (strcmp(tipoOperando, tipoProximoOperando) != 0)) {
-            // Caso específico para erro de string com número ou vice-versa
-            if ((strcmp(tipoOperando, "string") == 0 && (strcmp(tipoProximoOperando, "numero") == 0 || strcmp(tipoProximoOperando, "numero_real") == 0)) ||
-                ((strcmp(tipoOperando, "numero") == 0 || strcmp(tipoOperando, "numero_real") == 0) && strcmp(tipoProximoOperando, "string") == 0)) {
-                Erro("Erro de tipo: operação inválida entre número e string", NULL);
-            }
+            ((strcmp(tipoOperando, "string") == 0 && strcmp(tipoProximoOperando, "string") != 0) ||
+             (strcmp(tipoOperando, "numero") == 0 && strcmp(tipoProximoOperando, "string") == 0) ||
+             (strcmp(tipoOperando, "numero_real") == 0 && strcmp(tipoProximoOperando, "string") == 0))) {
+            Erro("Erro de tipo: operação inválida entre tipos incompatíveis", tokenAtual.lexema);
         }
 
         CasaToken(tokenAtual.tipo);  // Consome o próximo operando
