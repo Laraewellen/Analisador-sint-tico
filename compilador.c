@@ -37,7 +37,6 @@ void AnalisarExpressao();
 void AnalisarTermo();
 void AnalisarFator();
 
-// Funções para gerenciamento da tabela de símbolos
 void AdicionarSimbolo(const char *nome, const char *tipo) {
     if (contadorSimbolos < MAX_SIMBOLOS) {
         strcpy(tabelaSimbolos[contadorSimbolos].nome, nome);
@@ -158,23 +157,23 @@ Token ProximoToken() {
 
 void Erro(const char *mensagem, const char *token) {
     if (token != NULL) {
-        printf("Erro na linha %d: %s próximo a '%s'\n", linhaAtual, mensagem, token);
+        printf("%d: %s [%s].\n", linhaAtual, mensagem, token);
     } else {
-        printf("Erro na linha %d: %s\n", linhaAtual, mensagem);
+        printf("%d: %s.\n", linhaAtual, mensagem);
     }
-    exit(1);  // Interrompe a execução para que a análise não prossiga após um erro.
+    exit(1);  
 }
+
 
 void CasaToken(const char *tipoEsperado) {
     if (strcmp(tokenAtual.tipo, tipoEsperado) == 0) {
         printf("Consumindo token: %s [%s]\n", tokenAtual.tipo, tokenAtual.lexema);
         tokenAtual = ProximoToken();
     } else {
-        Erro("token não esperado", tipoEsperado);
+        Erro("token nao esperado", tokenAtual.lexema);
     }
 }
 
-// Função para inicializar o arquivo e o analisador
 void AnalisarPrograma() {
     CasaToken("program");
     CasaToken("identificador");
@@ -323,9 +322,9 @@ int main(int argc, char *argv[]) {
     if (strcmp(tokenAtual.tipo, "EOF") == 0) {
         printf("Compilação concluída com sucesso.\n");
     } else {
-        Erro("Símbolos após o final do programa", tokenAtual.tipo);
+        Erro("fim de arquivo não esperado", NULL);
     }
-
+    
     fclose(arquivoFonte);
     return 0;
 }
