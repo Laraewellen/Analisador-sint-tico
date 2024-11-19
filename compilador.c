@@ -312,7 +312,7 @@ void AnalisarComando() {
     CasaToken("else");
 
     if (strcmp(tokenAtual.tipo, ";") == 0) {
-        Erro("Comando inválido após 'else': vazio ou mal estruturado", tokenAtual.tipo);
+        Erro("Comando invalido apos 'else': vazio ou mal estruturado", tokenAtual.tipo);
     } else {
         AnalisarComando();
     }
@@ -325,7 +325,7 @@ void AnalisarComando() {
     } else if (strcmp(tokenAtual.tipo, "begin") == 0) {
         AnalisarComandoComposto();
     } else {
-        Erro("Comando inválido", tokenAtual.tipo);
+        Erro("Comando invalido", tokenAtual.tipo);
     }
 }
 
@@ -413,7 +413,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(tokenAtual.tipo, "EOF") == 0)
     {
-        printf("Compilação concluída com sucesso.\n");
+        printf("Analise concluida com sucesso.\n");
     }
     else
     {
