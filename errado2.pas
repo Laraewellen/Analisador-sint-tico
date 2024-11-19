@@ -1,9 +1,9 @@
-program erro_condicional_2;
+program erro2;
 var
-    y: integer;
+    c: integer;
 begin
-    y := 7;
-    if y < 10 then
-        writeln('Y é menor que 10')
-    else;  { Erro aqui: o "else" não pode ser seguido apenas de um ponto e vírgula }
+    c := 6;
+    if  { Erro aqui: falta a condição após o "if" }
+    else
+        writeln('Else executado');
 end.
