@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+// Definições de estruturas e variáveis globais
 typedef struct
 {
     char lexema[50];
@@ -62,10 +63,10 @@ const char *BuscarTipoSimbolo(const char *nome)
             return tabelaSimbolos[i].tipo;
         }
     }
-    return NULL; // 
+    return NULL; // Não encontrado
 }
 
-Token ProximoToken(){
+Token ProximoToken() {
     Token token = {"", "", linhaAtual};
     int c;
 
@@ -204,6 +205,7 @@ void CasaToken(const char *tipoEsperado)
 
 void AnalisarPrograma()
 {
+    printf("S -> program id ; S\n");
     CasaToken("program");
     CasaToken("identificador");
     CasaToken(";");
@@ -213,12 +215,14 @@ void AnalisarPrograma()
 
 void AnalisarBloco()
 {
+    printf("S -> S ; S\n");
     AnalisarDeclaracaoVariaveis();
     AnalisarComandoComposto();
 }
 
 void AnalisarDeclaracaoVariaveis()
 {
+    printf("S -> var S ;\n");
     CasaToken("var");
     while (strcmp(tokenAtual.tipo, "identificador") == 0)
     {
@@ -231,11 +235,13 @@ void AnalisarDeclaracaoVariaveis()
 
 void AnalisarListaIdentificadores()
 {
+    printf("S -> id\n");
     AdicionarSimbolo(tokenAtual.lexema, "");
     CasaToken("identificador");
     while (strcmp(tokenAtual.tipo, ",") == 0)
     {
         CasaToken(",");
+        printf("S -> id\n");
         AdicionarSimbolo(tokenAtual.lexema, "");
         CasaToken("identificador");
     }
@@ -245,6 +251,7 @@ void AnalisarTipo()
 {
     if (strcmp(tokenAtual.tipo, "integer") == 0 || strcmp(tokenAtual.tipo, "real") == 0)
     {
+        printf("S -> tipo\n");
         const char *tipo = tokenAtual.tipo;
         for (int i = contadorSimbolos - 1; i >= 0; i--)
         {
@@ -261,18 +268,13 @@ void AnalisarTipo()
     }
 }
 
-void AnalisarComandoComposto()
-{
+void AnalisarComandoComposto() {
     CasaToken("begin");
-    while (strcmp(tokenAtual.tipo, "end") != 0)
-    {
+    while (strcmp(tokenAtual.tipo, "end") != 0) {
         AnalisarComando();
-        if (strcmp(tokenAtual.tipo, ";") == 0)
-        {
+        if (strcmp(tokenAtual.tipo, ";") == 0) {
             CasaToken(";");
-        }
-        else if (strcmp(tokenAtual.tipo, "end") != 0)
-        {
+        } else if (strcmp(tokenAtual.tipo, "end") != 0) {
             Erro("Esperado ';' ou 'end'", tokenAtual.tipo);
         }
     }
