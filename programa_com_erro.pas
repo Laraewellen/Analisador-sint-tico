@@ -1,9 +1,10 @@
-program erro_declare_variavel;
+program erro_condicional_5;
 var
-    x: integer;
-    y: real;
-    z: integer real;  { Erro aqui: tentativa de declarar duas variáveis de tipos diferentes na mesma linha }
+    b: integer;
 begin
-    x := 10;
-    y := 5.5;
+    b := 8;
+    if b > 5  { Erro aqui: falta o "then" após a condição do "if" }
+        writeln('B é maior que 5')
+    else
+        writeln('Else executado');
 end.

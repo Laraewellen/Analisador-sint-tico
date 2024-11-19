@@ -1,6 +1,9 @@
-program erro_variavel_nao_inicializada;
+program erro_condicional_2;
 var
-    x: integer;
+    y: integer;
 begin
-    writeln(x);  { Erro aqui: a variável x não foi inicializada antes do uso }
+    y := 7;
+    if y < 10 then
+        writeln('Y é menor que 10')
+    else;  { Erro aqui: o "else" não pode ser seguido apenas de um ponto e vírgula }
 end.

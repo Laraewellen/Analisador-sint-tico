@@ -1,4 +1,4 @@
-program erro_condicional;
+program erro_condicional3;
 var
     x: integer;
 begin
