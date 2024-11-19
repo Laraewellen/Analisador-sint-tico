@@ -1,7 +1,7 @@
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <stdarg.h> // Necessário para manipulação de argumentos variáveis
 
 typedef struct
 {
@@ -17,17 +17,12 @@ typedef struct
 } Simbolo;
 
 #define MAX_SIMBOLOS 100
-#define MAX_PRODUCOES 100
-
 Simbolo tabelaSimbolos[MAX_SIMBOLOS];
 int contadorSimbolos = 0;
 
 FILE *arquivoFonte;
 Token tokenAtual;
 int linhaAtual = 1;
-
-char producoes[MAX_PRODUCOES][100];
-int contadorProducoes = 0;
 
 Token ProximoToken();
 void Erro(const char *mensagem, const char *tipoEsperado);
@@ -43,8 +38,6 @@ void AnalisarExpressaoRelacional();
 void AnalisarExpressao();
 void AnalisarTermo();
 void AnalisarFator();
-void RegistrarProducao(const char *producao, ...);
-void ExibirProducoes();
 
 void AdicionarSimbolo(const char *nome, const char *tipo)
 {
@@ -69,12 +62,117 @@ const char *BuscarTipoSimbolo(const char *nome)
             return tabelaSimbolos[i].tipo;
         }
     }
-    return NULL;
+    return NULL; // 
 }
 
-Token ProximoToken() {
-    // (O seu código original para ProximoToken foi mantido integralmente)
-    // ...
+Token ProximoToken(){
+    Token token = {"", "", linhaAtual};
+    int c;
+
+    while ((c = fgetc(arquivoFonte)) != EOF) {
+        if (c == ' ' || c == '\t') {
+            continue;
+        } else if (c == '\n') {
+            linhaAtual++;
+        } else if (c == '{') {
+            while ((c = fgetc(arquivoFonte)) != '}' && c != EOF) {
+                if (c == '\n') linhaAtual++;
+            }
+        } else if (c == '/' && (c = fgetc(arquivoFonte)) == '/') {
+            while ((c = fgetc(arquivoFonte)) != '\n' && c != EOF);
+            linhaAtual++;
+        } else {
+            ungetc(c, arquivoFonte);
+            break;
+        }
+    }
+
+    if (c == EOF) {
+        strcpy(token.tipo, "EOF");
+        return token;
+    }
+
+    c = fgetc(arquivoFonte);
+
+    if (c == '\'') { // Início de uma string
+        int i = 0;
+        c = fgetc(arquivoFonte); // Avança para o próximo caractere
+        while (c != '\'' && c != EOF && i < 49) { // Lê até encontrar outro apóstrofo ou EOF
+            token.lexema[i++] = c;
+            c = fgetc(arquivoFonte);
+        }
+        if (c != '\'') { // Verifica se a string foi fechada corretamente
+            Erro("String não fechada corretamente", NULL);
+        }
+        token.lexema[i] = '\0';
+        strcpy(token.tipo, "string");
+    } else if (isalpha(c)) {
+        int i = 0;
+        do {
+            token.lexema[i++] = c;
+            c = fgetc(arquivoFonte);
+        } while ((isalnum(c) || c == '_') && i < 49); 
+        ungetc(c, arquivoFonte);
+        token.lexema[i] = '\0';
+
+        if (strcmp(token.lexema, "program") == 0 || strcmp(token.lexema, "var") == 0 ||
+            strcmp(token.lexema, "begin") == 0 || strcmp(token.lexema, "end") == 0 ||
+            strcmp(token.lexema, "integer") == 0 || strcmp(token.lexema, "real") == 0 ||
+            strcmp(token.lexema, "if") == 0 || strcmp(token.lexema, "then") == 0 ||
+            strcmp(token.lexema, "else") == 0 || strcmp(token.lexema, "while") == 0 || 
+            strcmp(token.lexema, "do") == 0) {
+            strcpy(token.tipo, token.lexema);
+        } else {
+            strcpy(token.tipo, "identificador");
+        }
+    }
+    else if (isdigit(c)) {
+        int i = 0;
+        int pontoDecimal = 0;
+        do {
+            if (c == '.' && !pontoDecimal) {
+                pontoDecimal = 1;
+            } else if (c == '.' && pontoDecimal) {
+                break;
+            }
+            token.lexema[i++] = c;
+            c = fgetc(arquivoFonte);
+        } while ((isdigit(c) || c == '.') && i < 49);
+        ungetc(c, arquivoFonte);
+        token.lexema[i] = '\0';
+        strcpy(token.tipo, pontoDecimal ? "numero_real" : "numero");
+    }
+    else {
+        token.lexema[0] = c;
+        token.lexema[1] = '\0';
+        switch (c) {
+            case ':':
+                c = fgetc(arquivoFonte);
+                if (c == '=') {
+                    strcpy(token.lexema, ":=");
+                    strcpy(token.tipo, ":=");
+                } else {
+                    ungetc(c, arquivoFonte);
+                    strcpy(token.tipo, ":");
+                }
+                break;
+            case '(':
+                strcpy(token.tipo, "(");
+                break;
+            case ')':
+                strcpy(token.tipo, ")");
+                break;
+            case '>': case '<': case '=': case ';': case '.': case ',':
+            case '+': case '-': case '*': case '/':
+                strcpy(token.tipo, token.lexema);
+                break;
+            default:
+                printf("Erro: Caracter inválido '%c' (código %d) na linha %d\n", c, c, linhaAtual);
+                strcpy(token.tipo, "invalido");
+        }
+    }
+
+    token.linha = linhaAtual;
     return token;
 }
 
@@ -104,36 +202,8 @@ void CasaToken(const char *tipoEsperado)
     }
 }
 
-// Função para registrar regras de produção
-void RegistrarProducao(const char *producao, ...)
-{
-    if (contadorProducoes < MAX_PRODUCOES)
-    {
-        va_list args;
-        va_start(args, producao);
-        vsnprintf(producoes[contadorProducoes], sizeof(producoes[contadorProducoes]), producao, args);
-        va_end(args);
-        contadorProducoes++;
-    }
-    else
-    {
-        printf("Erro: limite de registro de produções atingido.\n");
-    }
-}
-
-// Função para exibir as regras de produção utilizadas
-void ExibirProducoes()
-{
-    printf("\nRegras de produção utilizadas:\n");
-    for (int i = 0; i < contadorProducoes; i++)
-    {
-        printf("%d. %s\n", i + 1, producoes[i]);
-    }
-}
-
 void AnalisarPrograma()
 {
-    RegistrarProducao("programa -> 'program' identificador ';' bloco '.'");
     CasaToken("program");
     CasaToken("identificador");
     CasaToken(";");
@@ -143,30 +213,24 @@ void AnalisarPrograma()
 
 void AnalisarBloco()
 {
-    RegistrarProducao("bloco -> declaracao_variaveis comando_composto");
     AnalisarDeclaracaoVariaveis();
     AnalisarComandoComposto();
 }
 
 void AnalisarDeclaracaoVariaveis()
 {
-    if (strcmp(tokenAtual.tipo, "var") == 0)
+    CasaToken("var");
+    while (strcmp(tokenAtual.tipo, "identificador") == 0)
     {
-        RegistrarProducao("declaracao_variaveis -> 'var' lista_identificadores ':' tipo ';' { lista_identificadores ':' tipo ';' }");
-        CasaToken("var");
-        while (strcmp(tokenAtual.tipo, "identificador") == 0)
-        {
-            AnalisarListaIdentificadores();
-            CasaToken(":");
-            AnalisarTipo();
-            CasaToken(";");
-        }
+        AnalisarListaIdentificadores();
+        CasaToken(":");
+        AnalisarTipo();
+        CasaToken(";");
     }
 }
 
 void AnalisarListaIdentificadores()
 {
-    RegistrarProducao("lista_identificadores -> identificador { ',' identificador }");
     AdicionarSimbolo(tokenAtual.lexema, "");
     CasaToken("identificador");
     while (strcmp(tokenAtual.tipo, ",") == 0)
@@ -179,7 +243,6 @@ void AnalisarListaIdentificadores()
 
 void AnalisarTipo()
 {
-    RegistrarProducao("tipo -> 'integer' | 'real'");
     if (strcmp(tokenAtual.tipo, "integer") == 0 || strcmp(tokenAtual.tipo, "real") == 0)
     {
         const char *tipo = tokenAtual.tipo;
@@ -200,7 +263,6 @@ void AnalisarTipo()
 
 void AnalisarComandoComposto()
 {
-    RegistrarProducao("comando_composto -> 'begin' comando { ';' comando } 'end'");
     CasaToken("begin");
     while (strcmp(tokenAtual.tipo, "end") != 0)
     {
@@ -217,8 +279,118 @@ void AnalisarComandoComposto()
     CasaToken("end");
 }
 
-// Outras funções permanecem inalteradas...
+void AnalisarComando() {
+    if (strcmp(tokenAtual.tipo, "identificador") == 0) {
+        const char *tipo = BuscarTipoSimbolo(tokenAtual.lexema);
 
+        if (tipo == NULL || strcmp(tokenAtual.lexema, "writeln") == 0) {
+            CasaToken("identificador");
+            if (strcmp(tokenAtual.tipo, "(") == 0) {
+                CasaToken("(");
+                while (strcmp(tokenAtual.tipo, ")") != 0) {
+                    AnalisarExpressao();
+                    if (strcmp(tokenAtual.tipo, ",") == 0) {
+                        CasaToken(",");
+                    }
+                }
+                CasaToken(")");
+            }
+        } else {
+            CasaToken("identificador");
+            CasaToken(":=");
+            AnalisarExpressao();
+        }
+    } else if (strcmp(tokenAtual.tipo, "if") == 0) {
+        CasaToken("if");
+        AnalisarExpressaoRelacional();
+        CasaToken("then");
+        AnalisarComando();
+
+ if (strcmp(tokenAtual.tipo, "else") == 0) {
+    CasaToken("else");
+
+    if (strcmp(tokenAtual.tipo, ";") == 0) {
+        Erro("Comando inválido após 'else': vazio ou mal estruturado", tokenAtual.tipo);
+    } else {
+        AnalisarComando();
+    }
+}
+    } else if (strcmp(tokenAtual.tipo, "while") == 0) {
+        CasaToken("while");
+        AnalisarExpressaoRelacional();
+        CasaToken("do");
+        AnalisarComando();
+    } else if (strcmp(tokenAtual.tipo, "begin") == 0) {
+        AnalisarComandoComposto();
+    } else {
+        Erro("Comando inválido", tokenAtual.tipo);
+    }
+}
+
+void AnalisarExpressaoRelacional()
+{
+    AnalisarExpressao();
+    if (strcmp(tokenAtual.tipo, "=") == 0 || strcmp(tokenAtual.tipo, "<") == 0 || strcmp(tokenAtual.tipo, ">") == 0)
+    {
+        CasaToken(tokenAtual.tipo);
+        AnalisarExpressao();
+    }
+    else
+    {
+        Erro("Operador relacional esperado", tokenAtual.tipo);
+    }
+}
+
+void AnalisarExpressao()
+{
+    AnalisarTermo();
+    while (strcmp(tokenAtual.tipo, "+") == 0 || strcmp(tokenAtual.tipo, "-") == 0)
+    {
+        CasaToken(tokenAtual.tipo);
+        AnalisarTermo();
+    }
+}
+
+void AnalisarTermo()
+{
+    AnalisarFator();
+    while (strcmp(tokenAtual.tipo, "*") == 0 || strcmp(tokenAtual.tipo, "/") == 0)
+    {
+        CasaToken(tokenAtual.tipo);
+        AnalisarFator();
+    }
+}
+
+void AnalisarFator()
+{
+    if (strcmp(tokenAtual.tipo, "identificador") == 0)
+    {
+        const char *tipo = BuscarTipoSimbolo(tokenAtual.lexema);
+        if (tipo == NULL)
+        {
+            Erro("Símbolo não declarado", tokenAtual.lexema);
+        }
+        CasaToken("identificador");
+    }
+    else if (strcmp(tokenAtual.tipo, "numero") == 0 || strcmp(tokenAtual.tipo, "numero_real") == 0)
+    {
+        CasaToken(tokenAtual.tipo);
+    }
+    else if (strcmp(tokenAtual.tipo, "string") == 0) // Novo caso para strings
+    {
+        CasaToken("string");
+    }
+    else if (strcmp(tokenAtual.tipo, "(") == 0)
+    {
+        CasaToken("(");
+        AnalisarExpressao();
+        CasaToken(")");
+    }
+    else
+    {
+        Erro("Fator inválido", tokenAtual.tipo);
+    }
+}
 int main(int argc, char *argv[])
 {
     if (argc < 2)
@@ -240,7 +412,6 @@ int main(int argc, char *argv[])
     if (strcmp(tokenAtual.tipo, "EOF") == 0)
     {
         printf("Compilação concluída com sucesso.\n");
-        ExibirProducoes(); // Exibe as regras de produção utilizadas
     }
     else
     {
