@@ -1,4 +1,4 @@
-program exemplo2;
+program exemplo3;
 var
     a, b: integer;
     c: real;
